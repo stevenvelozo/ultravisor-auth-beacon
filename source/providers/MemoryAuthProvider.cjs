@@ -90,17 +90,6 @@ class MemoryAuthProvider extends libAuthProviderBase
 		return this._Users.delete(String(pUsername).toLowerCase());
 	}
 
-	listUsers()
-	{
-		// Don't leak passwords.
-		let tmpOut = [];
-		this._Users.forEach((tmpU) =>
-		{
-			tmpOut.push({ UserID: tmpU.UserID, Username: tmpU.Username, Roles: tmpU.Roles.slice() });
-		});
-		return tmpOut;
-	}
-
 	// ============== AuthProviderBase contract ==============
 
 	async authenticate(pUsername, pPassword, pMethod)
@@ -231,9 +220,6 @@ class MemoryAuthProvider extends libAuthProviderBase
 		// pSelector ignored for now (in-memory list is small enough that
 		// every UI fetches the whole thing). Real-DB providers should
 		// honor at least {Search} for prefix matching.
-		let tmpUsers = this.listUsers ? null : null;
-		// Reuse the synchronous helper above so listUsers respects the
-		// "no passwords leaked" guarantee in one place.
 		let tmpOut = [];
 		this._Users.forEach((tmpU) =>
 		{

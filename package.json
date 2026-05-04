@@ -35,10 +35,11 @@
 	"author": "Steven Velozo <steven@velozo.com>",
 	"license": "MIT",
 	"dependencies": {
-		"ultravisor-beacon": "^0.0.12"
+		"ultravisor-beacon": "^0.0.14"
 	},
 	"devDependencies": {
-		"mocha": "^10.4.0"
+		"mocha": "^10.4.0",
+		"quackage": "^1.2.2"
 	},
 	"retoldBeacon": {
 		"displayName": "Ultravisor Auth Beacon",
