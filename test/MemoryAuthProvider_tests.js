@@ -73,7 +73,7 @@ suite
 
 		suite
 		(
-			'authenticate',
+			'authenticate (strict mode — Permissive:false)',
 			function ()
 			{
 				let _Provider = null;
@@ -83,6 +83,7 @@ suite
 					{
 						_Provider = new libMemoryAuthProvider(
 						{
+							Permissive: false,
 							Users: [{ Username: 'admin', Password: 'sekret', Roles: ['admin'] }]
 						});
 					}
@@ -163,6 +164,97 @@ suite
 						tmpResult.UserContext.Roles.push('mutated');
 						let tmpAgain = await _Provider.authenticate('admin', 'sekret');
 						libAssert.deepStrictEqual(tmpAgain.UserContext.Roles, ['admin']);
+					}
+				);
+			}
+		);
+
+		// Permissive is the default: dev rigs (the lab, smoke harnesses,
+		// hello-world demos) need to "just work" without anyone wiring real
+		// users. Anything touching real data should opt into Permissive:false.
+		suite
+		(
+			'authenticate (permissive default)',
+			function ()
+			{
+				test
+				(
+					'Empty config — accepts any non-empty username + password',
+					async function ()
+					{
+						let tmpProvider = new libMemoryAuthProvider();
+						let tmpResult = await tmpProvider.authenticate('data-mapper', 'whatever');
+						libAssert.strictEqual(tmpResult.Success, true);
+						libAssert.strictEqual(tmpResult.UserContext.Username, 'data-mapper');
+						libAssert.deepStrictEqual(tmpResult.UserContext.Roles, []);
+					}
+				);
+
+				test
+				(
+					'Empty config — rejects empty username (need an identifier)',
+					async function ()
+					{
+						let tmpProvider = new libMemoryAuthProvider();
+						let tmpResult = await tmpProvider.authenticate('', 'pw');
+						libAssert.strictEqual(tmpResult.Success, false);
+						libAssert.match(tmpResult.Reason, /required/i);
+					}
+				);
+
+				test
+				(
+					'Empty config — accepts empty password (lab clients often have none)',
+					async function ()
+					{
+						let tmpProvider = new libMemoryAuthProvider();
+						let tmpResult = await tmpProvider.authenticate('user', '');
+						libAssert.strictEqual(tmpResult.Success, true);
+						libAssert.strictEqual(tmpResult.UserContext.Username, 'user');
+					}
+				);
+
+				test
+				(
+					'Seeded user — correct password yields seeded roles',
+					async function ()
+					{
+						let tmpProvider = new libMemoryAuthProvider(
+						{
+							Users: [{ Username: 'admin', Password: 'sekret', Roles: ['admin'] }]
+						});
+						let tmpResult = await tmpProvider.authenticate('admin', 'sekret');
+						libAssert.strictEqual(tmpResult.Success, true);
+						libAssert.deepStrictEqual(tmpResult.UserContext.Roles, ['admin']);
+					}
+				);
+
+				test
+				(
+					'Seeded user — wrong password downgrades to permissive (no roles)',
+					async function ()
+					{
+						let tmpProvider = new libMemoryAuthProvider(
+						{
+							Users: [{ Username: 'admin', Password: 'sekret', Roles: ['admin'] }]
+						});
+						let tmpResult = await tmpProvider.authenticate('admin', 'wrong');
+						libAssert.strictEqual(tmpResult.Success, true);
+						libAssert.deepStrictEqual(tmpResult.UserContext.Roles, [],
+							'wrong password must NOT grant the seeded roles');
+					}
+				);
+
+				test
+				(
+					'Unknown user — synthesized context with username preserved as-supplied',
+					async function ()
+					{
+						let tmpProvider = new libMemoryAuthProvider();
+						let tmpResult = await tmpProvider.authenticate('Configs-Databeacon', 'pw');
+						libAssert.strictEqual(tmpResult.Success, true);
+						libAssert.strictEqual(tmpResult.UserContext.Username, 'Configs-Databeacon');
+						libAssert.strictEqual(tmpResult.UserContext.UserID, 'configs-databeacon');
 					}
 				);
 			}
@@ -637,11 +729,17 @@ suite
 						let tmpResult = await _Provider.updateUser('alice',
 							{ Username: 'aliceB' });
 						libAssert.strictEqual(tmpResult.Success, true);
+						// New name authenticates and carries the seeded role.
 						let tmpAuth = await _Provider.authenticate('aliceB', 'pw');
 						libAssert.strictEqual(tmpAuth.Success, true);
-						// Old name no longer authenticates.
+						libAssert.deepStrictEqual(tmpAuth.UserContext.Roles, ['user']);
+						// Old name no longer matches a seeded entry. Under the
+						// permissive default the request still synthesizes a
+						// context (so dev rigs keep working), but it MUST NOT
+						// carry the original seeded role.
 						let tmpOld = await _Provider.authenticate('alice', 'pw');
-						libAssert.strictEqual(tmpOld.Success, false);
+						libAssert.deepStrictEqual(tmpOld.UserContext.Roles, [],
+							'old username must not retain the seeded role after rename');
 					}
 				);
 

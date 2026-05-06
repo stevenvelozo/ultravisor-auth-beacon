@@ -196,6 +196,10 @@ suite
 					{
 						_Auth = new libMemoryAuthProvider(
 						{
+							// Strict mode so the bad-credentials test below
+							// can verify rejection. The permissive default is
+							// covered separately at the bottom of this file.
+							Permissive: false,
 							Users: [{ Username: 'alice', Password: 'pw', Roles: ['user'] }],
 							BeaconJoinSecret: 'shared'
 						});
@@ -484,6 +488,32 @@ suite
 						libAssert.strictEqual(tmpDispatch.Result.Outputs.Success, false);
 						libAssert.match(tmpDispatch.Result.Outputs.Reason,
 							/does not support bootstrap admin/i);
+					}
+				);
+			}
+		);
+
+		// End-to-end check that the provider's permissive default flows through
+		// the AUTH_Login work item — what every beacon's UV client actually
+		// hits when it logs in. The lab and dev rigs depend on this.
+		suite
+		(
+			'AUTH_Login — permissive default',
+			function ()
+			{
+				test
+				(
+					'Empty config — accepts any credentials',
+					async function ()
+					{
+						let tmpAuth = new libMemoryAuthProvider();
+						let tmpProv = new libProvider({ AuthProvider: tmpAuth });
+						let tmpDispatch = await dispatch(tmpProv, 'AUTH_Login',
+							{ Username: 'data-mapper', Password: 'anything' });
+						let tmpOut = tmpDispatch.Result.Outputs;
+						libAssert.strictEqual(tmpOut.Success, true);
+						libAssert.strictEqual(typeof tmpOut.SessionToken, 'string');
+						libAssert.strictEqual(tmpOut.UserContext.Username, 'data-mapper');
 					}
 				);
 			}

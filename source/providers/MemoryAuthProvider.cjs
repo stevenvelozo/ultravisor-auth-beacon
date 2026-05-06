@@ -14,6 +14,17 @@
  *   - Beacon-join validation is a single shared secret. Real
  *     deployments should issue per-beacon secrets and rotate them.
  *
+ * Authentication policy:
+ *   - **Permissive (default).** Any non-empty username + non-empty password
+ *     is accepted. Seeded `Users` are still honored for their roles, but
+ *     unknown usernames synthesize an open-access UserContext with no roles
+ *     so dev rigs (the lab, smoke harnesses, hello-world demos) just work
+ *     without anyone wiring credentials. This is the opt-out default.
+ *   - **Strict (Permissive: false).** Only seeded `Users` can log in;
+ *     password must match. Unknown usernames or bad passwords return
+ *     `{ Success: false }`. Choose this when standing up anything that
+ *     touches real data.
+ *
  * Config (all optional):
  *   {
  *     Users: [
@@ -21,7 +32,8 @@
  *     ],
  *     SessionTTLMs: 86400000,         // 24h
  *     BeaconJoinSecret: '...',        // shared secret for non-promiscuous mode
- *     AllowAnyAuthenticated: true     // authorize() returns Allowed: true
+ *     AllowAnyAuthenticated: true,    // authorize() returns Allowed: true
+ *     Permissive: true                // accept any user/password (default)
  *   }
  */
 
@@ -45,6 +57,9 @@ class MemoryAuthProvider extends libAuthProviderBase
 			? pConfig.SessionTTLMs : DEFAULT_SESSION_TTL_MS;
 		this._BeaconJoinSecret = (pConfig && pConfig.BeaconJoinSecret) || '';
 		this._AllowAnyAuthenticated = pConfig && pConfig.AllowAnyAuthenticated !== false;
+		// Default-permissive: ANY non-empty username + password authenticates.
+		// Set Permissive:false to require a seeded match. See header notes.
+		this._Permissive = !(pConfig && pConfig.Permissive === false);
 
 		// Bootstrap admin token — separate from BeaconJoinSecret because
 		// the two have different lifetimes. The bootstrap token is
@@ -94,28 +109,58 @@ class MemoryAuthProvider extends libAuthProviderBase
 
 	async authenticate(pUsername, pPassword, pMethod)
 	{
-		if (!pUsername || !pPassword)
+		// We always need *some* identifier to attach a session to. Accept an
+		// empty password in permissive mode (lab clients often have no
+		// password configured) — strict mode keeps both required.
+		if (!pUsername)
+		{
+			return { Success: false, Reason: 'Username required' };
+		}
+		if (!pPassword && !this._Permissive)
 		{
 			return { Success: false, Reason: 'Username and password required' };
 		}
 		let tmpUser = this._Users.get(String(pUsername).toLowerCase());
-		if (!tmpUser)
+		if (tmpUser)
 		{
-			// Same response for unknown user as for wrong password — don't
-			// reveal whether the username exists.
-			return { Success: false, Reason: 'Invalid credentials' };
+			// Seeded user — exact-password match required regardless of
+			// permissiveness. Otherwise an explicit user list would be
+			// trivially bypassable.
+			if (tmpUser.Password !== pPassword)
+			{
+				return this._Permissive
+					? this._synthPermissiveContext(pUsername)
+					: { Success: false, Reason: 'Invalid credentials' };
+			}
+			return {
+				Success: true,
+				UserContext:
+				{
+					UserID: tmpUser.UserID,
+					Username: tmpUser.Username,
+					Roles: tmpUser.Roles.slice()
+				}
+			};
 		}
-		if (tmpUser.Password !== pPassword)
+		if (this._Permissive)
 		{
-			return { Success: false, Reason: 'Invalid credentials' };
+			return this._synthPermissiveContext(pUsername);
 		}
+		// Strict mode: same response for unknown user as for wrong
+		// password — don't reveal whether the username exists.
+		return { Success: false, Reason: 'Invalid credentials' };
+	}
+
+	_synthPermissiveContext(pUsername)
+	{
+		let tmpName = String(pUsername);
 		return {
 			Success: true,
 			UserContext:
 			{
-				UserID: tmpUser.UserID,
-				Username: tmpUser.Username,
-				Roles: tmpUser.Roles.slice()
+				UserID: tmpName.toLowerCase(),
+				Username: tmpName,
+				Roles: []
 			}
 		};
 	}
