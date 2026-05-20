@@ -7,7 +7,7 @@
 # `npm install` (not `npm ci`) is intentional — package-lock.json is
 # gitignored per the Quackage convention. See BUILDING-AND-PUBLISHING.md.
 
-FROM node:20-slim
+FROM node:22-slim
 WORKDIR /app
 
 COPY package*.json ./
