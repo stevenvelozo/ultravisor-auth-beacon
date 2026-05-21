@@ -163,6 +163,34 @@ class AuthProviderBase
 		return fCallback ? fCallback(null) : null;
 	}
 
+	/**
+	 * Audit hook. Called by the auth-beacon provider on every Login,
+	 * ValidateSession, and Logout (success or failure).  Default: no-op.
+	 *
+	 * Subclasses should keep this fast and side-effect-free — it runs
+	 * inside the work-item dispatch path.  Heavy work (writing to a
+	 * persistent audit DB, calling an external SIEM) should be queued
+	 * asynchronously.  The MemoryAuthProvider's reference implementation
+	 * pushes into a small in-memory ring buffer so tests + operators can
+	 * inspect recent auth activity without standing up a real sink.
+	 *
+	 * @param {object} pEvent
+	 *   {
+	 *     Type: 'Login' | 'ValidateSession' | 'Logout',
+	 *     Success: boolean,
+	 *     Username?: string,            // present for Login
+	 *     UserID?: string|number,       // present when known
+	 *     SessionToken?: string,        // last 8 chars only (UI-safe)
+	 *     RequestingBeacon?: { Name, BeaconID, UserAgent? },
+	 *     Reason?: string,              // present for !Success
+	 *     Timestamp: ISO 8601 string
+	 *   }
+	 */
+	async onAuthEvent(pEvent)
+	{
+		// Default no-op.
+	}
+
 	// ============== User management contract ==============
 	//
 	// These are optional — providers that don't manage users (e.g.

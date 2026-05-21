@@ -33,6 +33,7 @@ const libCrypto = require('crypto');
 const libAuthProviderBase = require('./AuthProvider-Base.cjs');
 
 const DEFAULT_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_AUDIT_LOG_CAP = 500;
 
 class ExternalDirectoryAuthProvider extends libAuthProviderBase
 {
@@ -51,6 +52,13 @@ class ExternalDirectoryAuthProvider extends libAuthProviderBase
 		this._SessionTTLMs = (pConfig && pConfig.SessionTTLMs) || DEFAULT_SESSION_TTL_MS;
 		this._BeaconJoinSecret = (pConfig && pConfig.BeaconJoinSecret) || '';
 		this._AllowAnyAuthenticated = !!(pConfig && pConfig.AllowAnyAuthenticated !== false);
+
+		// Ring buffer for audit events.  Same shape as MemoryAuthProvider;
+		// see AuthProvider-Base.onAuthEvent for the event payload.
+		this._AuditCap = (pConfig && Number.isFinite(pConfig.AuditLogCap) && pConfig.AuditLogCap > 0)
+			? pConfig.AuditLogCap : DEFAULT_AUDIT_LOG_CAP;
+		this._AuditLog = [];
+		this._AuditCursor = 0;
 
 		let tmpSeed = (pConfig && pConfig.Users) || [];
 		for (let i = 0; i < tmpSeed.length; i++)
@@ -235,6 +243,46 @@ class ExternalDirectoryAuthProvider extends libAuthProviderBase
 	async consumeBootstrapToken(pToken, pUserSpec)
 	{
 		return { Success: false, Reason: 'Bootstrap admin is not available when the user store is external' };
+	}
+
+	// ============== Audit log ==============
+	//
+	// Same ring-buffer pattern as MemoryAuthProvider — kept duplicated
+	// instead of pulled into a shared mixin so the two providers stay
+	// independent of each other (custom forks of one don't pick up the
+	// other's behavioral changes for free).
+
+	async onAuthEvent(pEvent)
+	{
+		if (!pEvent || typeof pEvent !== 'object') { return; }
+		let tmpEntry = Object.assign({}, pEvent);
+		if (!tmpEntry.Timestamp) { tmpEntry.Timestamp = new Date().toISOString(); }
+		if (this._AuditLog.length < this._AuditCap)
+		{
+			this._AuditLog.push(tmpEntry);
+		}
+		else
+		{
+			this._AuditLog[this._AuditCursor] = tmpEntry;
+		}
+		this._AuditCursor = (this._AuditCursor + 1) % this._AuditCap;
+	}
+
+	getRecentAuthEvents(pLimit)
+	{
+		let tmpLen = this._AuditLog.length;
+		if (tmpLen === 0) { return []; }
+		let tmpRequest = Number.isFinite(pLimit) ? Math.max(1, Math.floor(pLimit)) : 100;
+		let tmpOut = Math.min(tmpRequest, tmpLen);
+		let tmpResult = [];
+		let tmpStart = (this._AuditCursor - 1 + this._AuditCap) % this._AuditCap;
+		if (tmpLen < this._AuditCap) { tmpStart = tmpLen - 1; }
+		for (let i = 0; i < tmpOut; i++)
+		{
+			let tmpIdx = (tmpStart - i + this._AuditCap) % this._AuditCap;
+			tmpResult.push(this._AuditLog[tmpIdx]);
+		}
+		return tmpResult;
 	}
 
 	// ============== Internals ==============

@@ -48,7 +48,8 @@ class UltravisorAuthBeaconProvider extends libBeaconCapabilityProvider
 				[
 					{ Name: 'Username', DataType: 'String', Required: true },
 					{ Name: 'Password', DataType: 'String', Required: true },
-					{ Name: 'Method',   DataType: 'String', Required: false, Description: 'Authentication method hint (password|totp|oauth|...)' }
+					{ Name: 'Method',   DataType: 'String', Required: false, Description: 'Authentication method hint (password|totp|oauth|...)' },
+					{ Name: 'RequestingBeacon', DataType: 'Object', Required: false, Description: 'Optional { Name, BeaconID, UserAgent? } identifying the beacon whose web app initiated this login — informational, captured in the auth-beacon audit log.' }
 				]
 			},
 			'AUTH_ValidateSession':
@@ -56,7 +57,8 @@ class UltravisorAuthBeaconProvider extends libBeaconCapabilityProvider
 				Description: 'Resolve a session token to a user context.',
 				SettingsSchema:
 				[
-					{ Name: 'SessionToken', DataType: 'String', Required: true }
+					{ Name: 'SessionToken', DataType: 'String', Required: true },
+					{ Name: 'RequestingBeacon', DataType: 'Object', Required: false, Description: 'Optional { Name, BeaconID, UserAgent? } identifying the requesting beacon — informational, captured in the audit log.' }
 				]
 			},
 			'AUTH_Logout':
@@ -64,7 +66,8 @@ class UltravisorAuthBeaconProvider extends libBeaconCapabilityProvider
 				Description: 'Invalidate a session token.',
 				SettingsSchema:
 				[
-					{ Name: 'SessionToken', DataType: 'String', Required: true }
+					{ Name: 'SessionToken', DataType: 'String', Required: true },
+					{ Name: 'RequestingBeacon', DataType: 'Object', Required: false, Description: 'Optional { Name, BeaconID, UserAgent? } identifying the requesting beacon — informational, captured in the audit log.' }
 				]
 			},
 			'AUTH_AuthorizeAction':
@@ -252,13 +255,31 @@ class UltravisorAuthBeaconProvider extends libBeaconCapabilityProvider
 
 	async _handleLogin(pSettings)
 	{
+		let tmpRequestingBeacon = pSettings && pSettings.RequestingBeacon;
 		let tmpAuth = await this._AuthProvider.authenticate(
 			pSettings.Username, pSettings.Password, pSettings.Method);
 		if (!tmpAuth || !tmpAuth.Success)
 		{
+			await this._emitAuditEvent(
+			{
+				Type: 'Login',
+				Success: false,
+				Username: pSettings.Username,
+				RequestingBeacon: tmpRequestingBeacon,
+				Reason: (tmpAuth && tmpAuth.Reason) || 'Invalid credentials'
+			});
 			return { Success: false, Reason: (tmpAuth && tmpAuth.Reason) || 'Invalid credentials' };
 		}
 		let tmpSession = await this._AuthProvider.createSession(tmpAuth.UserContext);
+		await this._emitAuditEvent(
+		{
+			Type: 'Login',
+			Success: true,
+			Username: pSettings.Username,
+			UserID: tmpAuth.UserContext && tmpAuth.UserContext.UserID,
+			SessionToken: this._scrubToken(tmpSession && tmpSession.SessionToken),
+			RequestingBeacon: tmpRequestingBeacon
+		});
 		return Object.assign(
 		{
 			Success: true,
@@ -268,7 +289,22 @@ class UltravisorAuthBeaconProvider extends libBeaconCapabilityProvider
 
 	async _handleValidateSession(pSettings)
 	{
+		let tmpRequestingBeacon = pSettings && pSettings.RequestingBeacon;
 		let tmpResult = await this._AuthProvider.validateSession(pSettings.SessionToken);
+		// Audit-log validation outcomes too — useful for tracking
+		// session re-validation patterns and detecting token reuse from
+		// unexpected beacons.  We DON'T log on every call from the
+		// beacon WebAuth's cached path (the beacon caches for 30s);
+		// providers can subsample if the volume gets noisy.
+		await this._emitAuditEvent(
+		{
+			Type: 'ValidateSession',
+			Success: !!(tmpResult && tmpResult.Valid),
+			UserID: tmpResult && tmpResult.UserContext && tmpResult.UserContext.UserID,
+			SessionToken: this._scrubToken(pSettings.SessionToken),
+			RequestingBeacon: tmpRequestingBeacon,
+			Reason: tmpResult && !tmpResult.Valid ? tmpResult.Reason : undefined
+		});
 		// Mirror the provider response back as Outputs — callers
 		// (UltravisorAuthBeaconBridge) read the same shape.
 		return tmpResult || { Valid: false, Reason: 'Provider returned nothing' };
@@ -276,8 +312,68 @@ class UltravisorAuthBeaconProvider extends libBeaconCapabilityProvider
 
 	async _handleLogout(pSettings)
 	{
+		let tmpRequestingBeacon = pSettings && pSettings.RequestingBeacon;
 		let tmpResult = await this._AuthProvider.revokeSession(pSettings.SessionToken);
+		await this._emitAuditEvent(
+		{
+			Type: 'Logout',
+			Success: !!(tmpResult && tmpResult.Success),
+			SessionToken: this._scrubToken(pSettings.SessionToken),
+			RequestingBeacon: tmpRequestingBeacon
+		});
 		return tmpResult || { Success: false };
+	}
+
+	/**
+	 * Helper: emit an audit event to the underlying AuthProvider's hook,
+	 * and structured-log the same payload so operators see it in stdout.
+	 * Errors thrown by the provider's hook are caught and warning-logged
+	 * — audit failures must never bring down the auth dispatch path.
+	 *
+	 * Sets Timestamp here so all events have a consistent clock source.
+	 */
+	async _emitAuditEvent(pPartial)
+	{
+		let tmpEvent = Object.assign({ Timestamp: new Date().toISOString() }, pPartial || {});
+		try
+		{
+			let tmpLog = (this.fable && this.fable.log) || console;
+			let tmpRb = tmpEvent.RequestingBeacon || {};
+			let tmpFrom = tmpRb.Name ? `from beacon=${tmpRb.Name}${tmpRb.BeaconID ? '@' + tmpRb.BeaconID : ''}` : 'from direct caller';
+			if (typeof tmpLog.info === 'function')
+			{
+				tmpLog.info(`[AuthBeacon] ${tmpEvent.Type} ${tmpEvent.Success ? 'OK' : 'FAIL'} `
+					+ `user=${tmpEvent.Username || tmpEvent.UserID || '-'} `
+					+ tmpFrom
+					+ (tmpEvent.Reason ? ` reason=${tmpEvent.Reason}` : ''));
+			}
+		}
+		catch (pLogErr) { /* logging is best-effort */ }
+
+		try
+		{
+			if (this._AuthProvider && typeof this._AuthProvider.onAuthEvent === 'function')
+			{
+				await this._AuthProvider.onAuthEvent(tmpEvent);
+			}
+		}
+		catch (pHookErr)
+		{
+			let tmpLog = (this.fable && this.fable.log) || console;
+			let tmpFn = (tmpLog && (tmpLog.warn || tmpLog.error)) || console.warn;
+			tmpFn(`[AuthBeacon] onAuthEvent hook threw: ${(pHookErr && pHookErr.message) || pHookErr}`);
+		}
+	}
+
+	/**
+	 * Return last-8 chars of a session token (or '' if absent).  We never
+	 * log the full token — even into a dev-mode audit buffer — so it
+	 * can't leak via screen-share, error reporting, or copy-paste.
+	 */
+	_scrubToken(pToken)
+	{
+		if (!pToken || typeof pToken !== 'string') { return ''; }
+		return pToken.length <= 8 ? pToken : `…${pToken.slice(-8)}`;
 	}
 
 	async _handleAuthorizeAction(pSettings)

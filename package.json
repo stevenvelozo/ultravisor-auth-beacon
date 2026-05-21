@@ -1,6 +1,6 @@
 {
 	"name": "ultravisor-auth-beacon",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Optional Ultravisor beacon that advertises the Authentication capability — login, session validation, beacon-join admission. Pluggable AuthProvider for custom backends (LDAP, OAuth, custom DBs).",
 	"main": "source/UltravisorAuthBeacon.cjs",
 	"bin": {
@@ -35,7 +35,7 @@
 	"author": "Steven Velozo <steven@velozo.com>",
 	"license": "MIT",
 	"dependencies": {
-		"ultravisor-beacon": "^1.0.0"
+		"ultravisor-beacon": "^1.0.1"
 	},
 	"devDependencies": {
 		"mocha": "^10.4.0",

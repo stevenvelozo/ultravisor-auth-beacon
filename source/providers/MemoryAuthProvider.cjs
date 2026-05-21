@@ -41,6 +41,7 @@ const libCrypto = require('crypto');
 const libAuthProviderBase = require('./AuthProvider-Base.cjs');
 
 const DEFAULT_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_AUDIT_LOG_CAP = 500;
 
 class MemoryAuthProvider extends libAuthProviderBase
 {
@@ -70,6 +71,15 @@ class MemoryAuthProvider extends libAuthProviderBase
 		// bootstrap token a tighter scope and rotate it after use.
 		this._BootstrapAdminToken = (pConfig && pConfig.BootstrapAdminToken) || '';
 		this._BootstrapConsumed = false;
+
+		// In-memory ring buffer for audit events.  Cap is configurable; the
+		// default of 500 is big enough for a dev session, small enough not
+		// to leak memory in long-running deployments.  Index points at the
+		// next write slot; reads walk newest → oldest.
+		this._AuditCap = (pConfig && Number.isFinite(pConfig.AuditLogCap) && pConfig.AuditLogCap > 0)
+			? pConfig.AuditLogCap : DEFAULT_AUDIT_LOG_CAP;
+		this._AuditLog = [];
+		this._AuditCursor = 0;
 
 		// Load any seed users from config
 		let tmpSeedUsers = (pConfig && pConfig.Users) || [];
@@ -482,6 +492,59 @@ class MemoryAuthProvider extends libAuthProviderBase
 		}
 		this._BootstrapConsumed = true;
 		return tmpCreate;
+	}
+
+	// ============== Audit log ==============
+	/**
+	 * Push an event into the in-process ring buffer.  Synchronous; safe
+	 * to call from the auth-beacon's hot dispatch path.  Callers (the
+	 * UltravisorAuthBeacon-Provider) await this for ordering only — the
+	 * implementation never throws and never blocks.
+	 */
+	async onAuthEvent(pEvent)
+	{
+		if (!pEvent || typeof pEvent !== 'object') { return; }
+		let tmpEntry = Object.assign({}, pEvent);
+		// Make sure Timestamp is always set (caller usually supplies it).
+		if (!tmpEntry.Timestamp) { tmpEntry.Timestamp = new Date().toISOString(); }
+		if (this._AuditLog.length < this._AuditCap)
+		{
+			this._AuditLog.push(tmpEntry);
+		}
+		else
+		{
+			this._AuditLog[this._AuditCursor] = tmpEntry;
+		}
+		this._AuditCursor = (this._AuditCursor + 1) % this._AuditCap;
+	}
+
+	/**
+	 * Return up to pLimit most-recent audit entries, newest first.  When
+	 * the buffer hasn't wrapped yet, the cursor IS the next-write slot
+	 * (==length); otherwise we walk modulo cap.
+	 *
+	 * @param {number} [pLimit] default 100, capped at the configured size
+	 * @returns {object[]}
+	 */
+	getRecentAuthEvents(pLimit)
+	{
+		let tmpLen = this._AuditLog.length;
+		if (tmpLen === 0) { return []; }
+		let tmpRequest = Number.isFinite(pLimit) ? Math.max(1, Math.floor(pLimit)) : 100;
+		let tmpOut = Math.min(tmpRequest, tmpLen);
+		let tmpResult = [];
+		// Walk backwards from the most-recent write.  When the buffer
+		// hasn't wrapped (tmpLen < cap), _AuditCursor === tmpLen, so the
+		// last index is tmpLen-1.  After wrap, _AuditCursor points at the
+		// oldest entry; the last write is at (cursor - 1 + cap) % cap.
+		let tmpStart = (this._AuditCursor - 1 + this._AuditCap) % this._AuditCap;
+		if (tmpLen < this._AuditCap) { tmpStart = tmpLen - 1; }
+		for (let i = 0; i < tmpOut; i++)
+		{
+			let tmpIdx = (tmpStart - i + this._AuditCap) % this._AuditCap;
+			tmpResult.push(this._AuditLog[tmpIdx]);
+		}
+		return tmpResult;
 	}
 
 	// ============== Internals ==============
