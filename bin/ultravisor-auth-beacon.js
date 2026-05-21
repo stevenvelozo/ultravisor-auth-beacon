@@ -10,12 +10,14 @@
  *   --name NAME           Beacon name (default auth-beacon)
  *   --join-secret SECRET  Bootstrap secret this beacon presents on join
  *   --config PATH         JSON config file (overrides everything)
- *   --provider PATH       require()-able path to a custom AuthProvider class
+ *   --provider NAME|PATH  Built-in short name (`memory`, `external-directory`)
+ *                         OR require()-able path to a custom AuthProvider class.
  *
  * The default provider is MemoryAuthProvider with a single
  * admin/admin user — useful for kicking the tires but obviously NOT a
- * production setup. Pass --provider /path/to/my-provider.cjs to swap
- * in your own.
+ * production setup. Pass --provider external-directory to use the
+ * read-only directory simulation, or --provider /path/to/my-provider.cjs
+ * to swap in your own.
  *
  * Custom provider modules export the AuthProvider CLASS (not an
  * instance). The CLI instantiates it with whatever's at
@@ -27,6 +29,16 @@ const libFS = require('fs');
 
 const libUltravisorAuthBeacon = require('../source/UltravisorAuthBeacon.cjs');
 const libMemoryAuthProvider = require('../source/providers/MemoryAuthProvider.cjs');
+const libExternalDirectoryAuthProvider = require('../source/providers/ExternalDirectoryAuthProvider.cjs');
+
+// Short-name → built-in module mapping for --provider.  Anything not in
+// this map is treated as a require()-able path so custom providers stay
+// supported.
+const BUILT_IN_PROVIDERS =
+{
+	'memory':             libMemoryAuthProvider,
+	'external-directory': libExternalDirectoryAuthProvider
+};
 
 let _Config =
 {
@@ -76,15 +88,38 @@ Options:
   --name NAME           Beacon name (default auth-beacon)
   --join-secret SECRET  Bootstrap secret this beacon presents on join
   --config PATH         JSON config file (overrides everything)
-  --provider PATH       require()-able path to a custom AuthProvider class
+  --provider NAME|PATH  Built-in: 'memory' (default), 'external-directory'.
+                        Or a require()-able path to a custom AuthProvider class.
 `);
 		process.exit(0);
 	}
 }
 
-// Resolve the AuthProvider — custom module or built-in default.
+// Resolve the AuthProvider — short-name built-in, custom module, or default.
 let tmpAuthProvider;
-if (_Config.ProviderModule)
+if (_Config.ProviderModule && BUILT_IN_PROVIDERS[_Config.ProviderModule])
+{
+	// Short-name path: load a built-in class.  ProviderConfig carries any
+	// per-provider settings (Users, BeaconJoinSecret, SessionTTLMs, …).
+	let tmpProviderClass = BUILT_IN_PROVIDERS[_Config.ProviderModule];
+	let tmpProviderConfig = _Config.ProviderConfig || {};
+	// Same JoinSecret-shorthand the MemoryAuthProvider default path uses
+	// below: when only one secret is provided, share it across both the
+	// beacon's own bootstrap join AND the policy that admits other beacons.
+	if (!tmpProviderConfig.BeaconJoinSecret && _Config.JoinSecret)
+	{
+		tmpProviderConfig.BeaconJoinSecret = _Config.JoinSecret;
+	}
+	if (_Config.ProviderModule === 'memory'
+		&& !tmpProviderConfig.BootstrapAdminToken
+		&& _Config.BootstrapAdminToken)
+	{
+		tmpProviderConfig.BootstrapAdminToken = _Config.BootstrapAdminToken;
+	}
+	tmpAuthProvider = new tmpProviderClass(tmpProviderConfig);
+	console.log(`[ultravisor-auth-beacon] Using built-in '${_Config.ProviderModule}' provider`);
+}
+else if (_Config.ProviderModule)
 {
 	let tmpResolved = libPath.resolve(_Config.ProviderModule);
 	let tmpProviderClass;

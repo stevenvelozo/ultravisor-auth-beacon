@@ -78,7 +78,7 @@ class UltravisorAuthBeacon
 			// Auth is identity, not data — every request is small and
 			// chatty, so a 30s heartbeat is plenty.
 			HeartbeatIntervalMs: 30000,
-			Tags: { Role: 'auth' }
+			Tags: this.getRegistrationTags()
 		};
 
 		this._Client = new libBeaconClient(tmpClientConfig);
@@ -127,9 +127,43 @@ class UltravisorAuthBeacon
 	{
 		return this._AuthProvider;
 	}
+
+	/**
+	 * Compute the Tags hash the beacon advertises at registration.
+	 * Public so tests can verify the capability surface without standing
+	 * up a network endpoint, and so operators can introspect what the
+	 * beacon claims about itself.
+	 *
+	 * Tags emitted:
+	 *   Role            : always 'auth'
+	 *   UserManagement  : 'internal' when the underlying provider's
+	 *                     supportsUserManagement() returns true; else
+	 *                     'external'.  Ultravisor's /status endpoint
+	 *                     reads this to drive the web UI's in-app user
+	 *                     admin views.
+	 *
+	 * Custom subclasses may extend by overriding — call super and merge
+	 * additional tags into the returned object.
+	 */
+	getRegistrationTags()
+	{
+		let tmpUserMgmt = 'external';
+		try
+		{
+			if (this._AuthProvider
+				&& typeof this._AuthProvider.supportsUserManagement === 'function'
+				&& this._AuthProvider.supportsUserManagement())
+			{
+				tmpUserMgmt = 'internal';
+			}
+		}
+		catch (pUmErr) { tmpUserMgmt = 'external'; }
+		return { Role: 'auth', UserManagement: tmpUserMgmt };
+	}
 }
 
 module.exports = UltravisorAuthBeacon;
 module.exports.AuthProviderBase = require('./providers/AuthProvider-Base.cjs');
 module.exports.MemoryAuthProvider = require('./providers/MemoryAuthProvider.cjs');
+module.exports.ExternalDirectoryAuthProvider = require('./providers/ExternalDirectoryAuthProvider.cjs');
 module.exports.UltravisorAuthBeaconProvider = libAuthBeaconProvider;

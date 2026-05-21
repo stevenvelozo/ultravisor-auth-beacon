@@ -35,7 +35,7 @@
 	"author": "Steven Velozo <steven@velozo.com>",
 	"license": "MIT",
 	"dependencies": {
-		"ultravisor-beacon": "^0.0.14"
+		"ultravisor-beacon": "^1.0.0"
 	},
 	"devDependencies": {
 		"mocha": "^10.4.0",

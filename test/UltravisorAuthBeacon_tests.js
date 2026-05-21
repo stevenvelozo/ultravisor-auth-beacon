@@ -12,6 +12,7 @@ const libAssert = require('assert');
 
 const libBeacon = require('../source/UltravisorAuthBeacon.cjs');
 const libMemoryAuthProvider = require('../source/providers/MemoryAuthProvider.cjs');
+const libExternalDirectoryAuthProvider = require('../source/providers/ExternalDirectoryAuthProvider.cjs');
 
 suite
 (
@@ -135,6 +136,54 @@ suite
 
 		suite
 		(
+			'Registration tags',
+			function ()
+			{
+				test
+				(
+					'Stamps UserManagement: internal when provider supports CRUD',
+					function ()
+					{
+						let tmpAuth = new libMemoryAuthProvider();
+						let tmpBeacon = new libBeacon({ AuthProvider: tmpAuth });
+						let tmpTags = tmpBeacon.getRegistrationTags();
+						libAssert.strictEqual(tmpTags.Role, 'auth');
+						libAssert.strictEqual(tmpTags.UserManagement, 'internal');
+					}
+				);
+
+				test
+				(
+					'Stamps UserManagement: external when provider does not support CRUD',
+					function ()
+					{
+						let tmpAuth = new libExternalDirectoryAuthProvider();
+						let tmpBeacon = new libBeacon({ AuthProvider: tmpAuth });
+						let tmpTags = tmpBeacon.getRegistrationTags();
+						libAssert.strictEqual(tmpTags.Role, 'auth');
+						libAssert.strictEqual(tmpTags.UserManagement, 'external');
+					}
+				);
+
+				test
+				(
+					'Falls back to external when provider lacks supportsUserManagement',
+					function ()
+					{
+						// A minimal duck-typed provider that doesn't implement
+						// the capability flag — every legacy provider that
+						// predates the addition.
+						let tmpAuth = { Name: 'legacy' };
+						let tmpBeacon = new libBeacon({ AuthProvider: tmpAuth });
+						let tmpTags = tmpBeacon.getRegistrationTags();
+						libAssert.strictEqual(tmpTags.UserManagement, 'external');
+					}
+				);
+			}
+		);
+
+		suite
+		(
 			'Module re-exports',
 			function ()
 			{
@@ -156,6 +205,18 @@ suite
 						libAssert.ok(libBeacon.MemoryAuthProvider);
 						let tmpInstance = new libBeacon.MemoryAuthProvider();
 						libAssert.strictEqual(tmpInstance.Name, 'MemoryAuthProvider');
+					}
+				);
+
+				test
+				(
+					'Should re-export ExternalDirectoryAuthProvider',
+					function ()
+					{
+						libAssert.ok(libBeacon.ExternalDirectoryAuthProvider);
+						let tmpInstance = new libBeacon.ExternalDirectoryAuthProvider();
+						libAssert.strictEqual(tmpInstance.Name, 'ExternalDirectoryAuthProvider');
+						libAssert.strictEqual(tmpInstance.supportsUserManagement(), false);
 					}
 				);
 
