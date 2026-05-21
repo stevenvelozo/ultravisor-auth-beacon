@@ -1,6 +1,6 @@
 {
 	"name": "ultravisor-auth-beacon",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "Optional Ultravisor beacon that advertises the Authentication capability — login, session validation, beacon-join admission. Pluggable AuthProvider for custom backends (LDAP, OAuth, custom DBs).",
 	"main": "source/UltravisorAuthBeacon.cjs",
 	"bin": {
