@@ -1,0 +1,7 @@
+{
+	"Name": "ultravisor-auth-beacon",
+	"Version": "1.0.3",
+	"Description": "Optional Ultravisor beacon that advertises the Authentication capability — login, session validation, beacon-join admission. Pluggable AuthProvider for custom backends (LDAP, OAuth, custom DBs).",
+	"GeneratedAt": "2026-05-30T22:12:00.294Z",
+	"GitCommit": "75c8979"
+}

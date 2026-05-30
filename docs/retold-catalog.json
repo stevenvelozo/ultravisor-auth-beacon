@@ -1,0 +1,72 @@
+{
+	"Generated": "2026-05-30T22:12:00.034Z",
+	"Mode": "module",
+	"GitHubOrg": "stevenvelozo",
+	"DefaultBranch": "master",
+	"Module": {
+		"Name": "ultravisor-auth-beacon",
+		"Repo": "ultravisor-auth-beacon",
+		"Group": "",
+		"Branch": "master",
+		"HasDocs": true,
+		"HasCover": true,
+		"Sidebar": [
+			{
+				"Title": "Getting Started",
+				"Children": [
+					{
+						"Title": "Introduction",
+						"Path": "README.md"
+					},
+					{
+						"Title": "Quick Start",
+						"Path": "quickstart.md"
+					},
+					{
+						"Title": "Architecture",
+						"Path": "architecture.md"
+					}
+				]
+			},
+			{
+				"Title": "Providers",
+				"Children": [
+					{
+						"Title": "AuthProvider Guide",
+						"Path": "auth-provider.md"
+					}
+				]
+			},
+			{
+				"Title": "Related Modules",
+				"Children": [
+					{
+						"Title": "ultravisor",
+						"Path": "https://stevenvelozo.github.io/ultravisor"
+					},
+					{
+						"Title": "ultravisor-beacon",
+						"Path": "https://stevenvelozo.github.io/ultravisor-beacon"
+					},
+					{
+						"Title": "orator-authentication",
+						"Path": "https://fable-retold.github.io/orator-authentication"
+					},
+					{
+						"Title": "pict-section-usermanagement",
+						"Path": "https://fable-retold.github.io/pict-section-usermanagement"
+					}
+				]
+			}
+		],
+		"DocFiles": [
+			"README.md",
+			"_cover.md",
+			"_sidebar.md",
+			"architecture.md",
+			"auth-provider.md",
+			"quickstart.md"
+		]
+	},
+	"Groups": []
+}
