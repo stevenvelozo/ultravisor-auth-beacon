@@ -1,5 +1,7 @@
 # Ultravisor Auth Beacon
 
+> **[Read the Ultravisor Auth Beacon Documentation](https://stevenvelozo.github.io/ultravisor-auth-beacon/)**
+
 > Optional Ultravisor beacon that advertises the **Authentication** capability - login, session validation, and beacon-join admission, backed by a pluggable `AuthProvider`.
 
 `ultravisor-auth-beacon` is a standalone, long-running service. It connects *out* to an [ultravisor](https://github.com/stevenvelozo/ultravisor) server as a beacon (using [ultravisor-beacon](https://github.com/stevenvelozo/ultravisor-beacon)) and serves a single capability: `Authentication`. The mesh dispatches `AUTH_*` work items to the beacon; the beacon delegates each one to an `AuthProvider` you supply - a `MemoryAuthProvider` for development, the read-only `ExternalDirectoryAuthProvider`, or your own class wrapping LDAP, OAuth/OIDC, or a custom user database.
