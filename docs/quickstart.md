@@ -1,6 +1,6 @@
 # Quick Start
 
-This guide walks through running an auth beacon against an Ultravisor server — first from the CLI with the built-in development provider, then embedded in your own Node process, then with a custom `AuthProvider`.
+This guide walks through running an auth beacon against an Ultravisor server - first from the CLI with the built-in development provider, then embedded in your own Node process, then with a custom `AuthProvider`.
 
 ## Prerequisites
 
@@ -36,14 +36,14 @@ With no `--provider` and no `--bootstrap-admin-token`, the CLI starts a `MemoryA
 | `--join-secret SECRET` | `''` | Bootstrap secret this beacon presents when it joins the mesh |
 | `--bootstrap-admin-token TOKEN` | `''` | One-shot token for `AUTH_BootstrapAdmin` (memory provider) |
 | `--provider NAME\|PATH` | `memory` | Built-in short name (`memory`, `external-directory`) or a `require()`-able path to a custom `AuthProvider` class |
-| `--config PATH` | — | JSON config file (loaded first; CLI flags override it) |
-| `--help`, `-h` | — | Print usage and exit |
+| `--config PATH` | - | JSON config file (loaded first; CLI flags override it) |
+| `--help`, `-h` | - | Print usage and exit |
 
 ### Provider selection
 
-- `--provider memory` — the development default. Full user management.
-- `--provider external-directory` — the read-only `ExternalDirectoryAuthProvider`: validates credentials and mints sessions, but all user CRUD is disabled.
-- `--provider /path/to/MyProvider.cjs` — anything not matching a built-in short name is treated as a path. The module must export the provider **class** (not an instance). The CLI instantiates it with whatever is at `ProviderConfig` in the JSON config file.
+- `--provider memory` - the development default. Full user management.
+- `--provider external-directory` - the read-only `ExternalDirectoryAuthProvider`: validates credentials and mints sessions, but all user CRUD is disabled.
+- `--provider /path/to/MyProvider.cjs` - anything not matching a built-in short name is treated as a path. The module must export the provider **class** (not an instance). The CLI instantiates it with whatever is at `ProviderConfig` in the JSON config file.
 
 ### Config file
 
@@ -99,7 +99,7 @@ _Beacon.start((pError, pBeaconID) =>
 	console.log('Auth beacon online as ' + (pBeaconID || 'auth-primary'));
 });
 
-// Graceful shutdown — deregisters from the mesh and shuts the provider down.
+// Graceful shutdown - deregisters from the mesh and shuts the provider down.
 process.on('SIGTERM', () =>
 {
 	_Beacon.stop(() => process.exit(0));
@@ -112,7 +112,7 @@ process.on('SIGTERM', () =>
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `AuthProvider` | — | **Required.** An `AuthProviderBase` instance |
+| `AuthProvider` | - | **Required.** An `AuthProviderBase` instance |
 | `BeaconName` | `auth-beacon` | Beacon name advertised to the mesh |
 | `UltravisorURL` | `http://localhost:54321` | Ultravisor server URL |
 | `JoinSecret` | `''` | Bootstrap secret this beacon presents on join |
@@ -176,5 +176,5 @@ The full method contract, return shapes, the audit hook, and the optional user-m
 
 ## Next Steps
 
-- [Architecture](architecture.md) — how the beacon, provider, and mesh fit together, plus the security notes
-- [AuthProvider Guide](auth-provider.md) — the complete provider interface
+- [Architecture](architecture.md) - how the beacon, provider, and mesh fit together, plus the security notes
+- [AuthProvider Guide](auth-provider.md) - the complete provider interface

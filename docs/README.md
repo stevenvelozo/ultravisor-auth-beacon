@@ -1,6 +1,6 @@
 # Ultravisor Auth Beacon
 
-> Optional Ultravisor beacon that advertises the **Authentication** capability — login, session validation, and beacon-join admission, backed by a pluggable `AuthProvider`.
+> Optional Ultravisor beacon that advertises the **Authentication** capability - login, session validation, and beacon-join admission, backed by a pluggable `AuthProvider`.
 
 Ultravisor Auth Beacon is a standalone, long-running service that connects to an Ultravisor server as a beacon and serves a single capability: `Authentication`. The mesh dispatches `AUTH_*` work items to the beacon, and the beacon delegates each one to an `AuthProvider` you supply.
 
@@ -12,20 +12,20 @@ This is a security-sensitive component. A few properties to understand up front,
 
 - **The beacon does not impose its own auth policy.** It dispatches actions to the provider and shapes the response. The provider decides what a valid credential is, how sessions are minted and expired, and who may join the mesh.
 - **The built-in providers are for development and test fixtures, not production.** Both `MemoryAuthProvider` and `ExternalDirectoryAuthProvider` compare passwords as plaintext, keep sessions in process memory, and apply no rate limiting. Their own source headers say so.
-- **Session tokens are scrubbed before they are logged.** The beacon never writes a full session token to a log line or audit event — only the last 8 characters, prefixed with an ellipsis.
+- **Session tokens are scrubbed before they are logged.** The beacon never writes a full session token to a log line or audit event - only the last 8 characters, prefixed with an ellipsis.
 - **Beacon-join and bootstrap secrets are compared in constant time** in the built-in providers (`crypto.timingSafeEqual`).
 
 See [Architecture](architecture.md) for the full discussion, including the trust boundaries and the documented limitations of the built-in providers.
 
 ## Features
 
-- **Single capability, clear contract** — advertises `Authentication` with a fixed set of `AUTH_*` actions, each mapping 1:1 to one `AuthProvider` method.
-- **Pluggable AuthProvider** — subclass `AuthProviderBase` to wrap any identity backend. The base class is the entire extension surface.
-- **Built-in providers** — `MemoryAuthProvider` (full user management, development default) and `ExternalDirectoryAuthProvider` (validate-only, user store owned elsewhere).
-- **Optional user management** — providers opt in via `supportsUserManagement()`; the beacon short-circuits `AUTH_*User` actions for read-only backends.
-- **Audit hook** — every login, session validation, and logout is emitted to the provider's `onAuthEvent()` hook and structured-logged, with the originating beacon attributed when supplied.
-- **Beacon-join admission** — answers Ultravisor's join-validation calls in non-promiscuous mode.
-- **HTTP route helper** — `mountUserManagementRoutes()` exposes a standard `/Users` CRUD + password REST surface on any orator-authentication host.
+- **Single capability, clear contract** - advertises `Authentication` with a fixed set of `AUTH_*` actions, each mapping 1:1 to one `AuthProvider` method.
+- **Pluggable AuthProvider** - subclass `AuthProviderBase` to wrap any identity backend. The base class is the entire extension surface.
+- **Built-in providers** - `MemoryAuthProvider` (full user management, development default) and `ExternalDirectoryAuthProvider` (validate-only, user store owned elsewhere).
+- **Optional user management** - providers opt in via `supportsUserManagement()`; the beacon short-circuits `AUTH_*User` actions for read-only backends.
+- **Audit hook** - every login, session validation, and logout is emitted to the provider's `onAuthEvent()` hook and structured-logged, with the originating beacon attributed when supplied.
+- **Beacon-join admission** - answers Ultravisor's join-validation calls in non-promiscuous mode.
+- **HTTP route helper** - `mountUserManagementRoutes()` exposes a standard `/Users` CRUD + password REST surface on any orator-authentication host.
 
 ## Quick Start
 
@@ -71,7 +71,7 @@ The beacon's provider (`UltravisorAuthBeacon-Provider.cjs`) declares the followi
 | `AUTH_AuthorizeAction` | `SessionToken` (req), `Capability` (req), `Action` (req) | `{ Allowed: true \| false, Reason }` |
 | `AUTH_ValidateBeaconJoin` | `BeaconName` (req), `JoinSecret` (req), `Capabilities` | `{ Allowed: true \| false, Reason }` |
 
-`Method` is an authentication-method hint (`password` / `totp` / `oauth` / provider-defined). `RequestingBeacon` is an optional `{ Name, BeaconID, UserAgent? }` object identifying which beacon's web app initiated the request — it is informational only and is captured in the audit log.
+`Method` is an authentication-method hint (`password` / `totp` / `oauth` / provider-defined). `RequestingBeacon` is an optional `{ Name, BeaconID, UserAgent? }` object identifying which beacon's web app initiated the request - it is informational only and is captured in the audit log.
 
 ### User-management actions
 
@@ -88,7 +88,7 @@ These are optional. They only do work if the underlying provider returns `true` 
 | `AUTH_ChangePassword` | `UserID` (req), `CurrentPassword` (req), `NewPassword` (req) | Self-service; verifies current password |
 | `AUTH_BootstrapAdmin` | `Token` (req), `UserSpec` (req) | One-time first-admin creation; consumes the token on success |
 
-> Authorization for the user-management actions (who is allowed to call which) is the **caller's** responsibility. The beacon performs the operation as requested. The typical wiring checks session + role at the HTTP route, then dispatches the action — see [`mountUserManagementRoutes`](#http-route-helper) below.
+> Authorization for the user-management actions (who is allowed to call which) is the **caller's** responsibility. The beacon performs the operation as requested. The typical wiring checks session + role at the HTTP route, then dispatches the action - see [`mountUserManagementRoutes`](#http-route-helper) below.
 
 ### Error handling
 
@@ -129,14 +129,14 @@ The `IsAdmin` function is the only authorization gate the helper applies. Admin 
 
 ## Documentation
 
-- [Quick Start](quickstart.md) — run the beacon from the CLI and embedded
-- [Architecture](architecture.md) — design, flows, trust boundaries, and security notes
-- [AuthProvider Guide](auth-provider.md) — write a custom backend (LDAP / OAuth / custom DB)
+- [Quick Start](quickstart.md) - run the beacon from the CLI and embedded
+- [Architecture](architecture.md) - design, flows, trust boundaries, and security notes
+- [AuthProvider Guide](auth-provider.md) - write a custom backend (LDAP / OAuth / custom DB)
 - [Building and Publishing](https://github.com/stevenvelozo/ultravisor-auth-beacon/blob/main/BUILDING-AND-PUBLISHING.md)
 
 ## Related Modules
 
-- [ultravisor](https://stevenvelozo.github.io/ultravisor) — process supervision and orchestration server (the mesh coordinator)
-- [ultravisor-beacon](https://stevenvelozo.github.io/ultravisor-beacon) — the beacon client this service is built on
-- [orator-authentication](https://fable-retold.github.io/orator-authentication) — HTTP session + credential middleware that consumes this beacon
-- [pict-section-usermanagement](https://fable-retold.github.io/pict-section-usermanagement) — front-end user-administration views
+- [ultravisor](https://stevenvelozo.github.io/ultravisor) - process supervision and orchestration server (the mesh coordinator)
+- [ultravisor-beacon](https://stevenvelozo.github.io/ultravisor-beacon) - the beacon client this service is built on
+- [orator-authentication](https://fable-retold.github.io/orator-authentication) - HTTP session + credential middleware that consumes this beacon
+- [pict-section-usermanagement](https://fable-retold.github.io/pict-section-usermanagement) - front-end user-administration views
