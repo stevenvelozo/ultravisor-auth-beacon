@@ -1,0 +1,23 @@
+graph TD
+	CLI[bin/ultravisor-auth-beacon.js<br/><small>CLI entry</small>]
+	BEACON[UltravisorAuthBeacon<br/><small>lifecycle</small>]
+	CAP[UltravisorAuthBeaconProvider<br/><small>Authentication capability</small>]
+	BC[ultravisor-beacon<br/>Beacon Client]
+	BASE[AuthProviderBase<br/><small>contract + defaults</small>]
+	MEM[MemoryAuthProvider]
+	EXT[ExternalDirectoryAuthProvider]
+	CUSTOM[Your AuthProvider]
+	UV[Ultravisor Server]
+
+	CLI -->|constructs| BEACON
+	BEACON -->|wraps as capability provider| CAP
+	BEACON -->|starts| BC
+	BC <-->|beacon WebSocket| UV
+	CAP -->|delegates AUTH_* to| BASE
+	BASE -.->|extended by| MEM
+	BASE -.->|extended by| EXT
+	BASE -.->|extended by| CUSTOM
+
+	style CAP fill:#e1f5fe
+	style BASE fill:#fff3e0
+	style CUSTOM fill:#c8e6c9

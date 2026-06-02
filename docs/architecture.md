@@ -18,31 +18,8 @@ This page describes the components, the request flows, the trust boundaries, and
 
 The beacon class composes the provider, and the provider extends `ultravisor-beacon`'s `Ultravisor-Beacon-CapabilityProvider`. Two files instead of one because the boot sequence and the capability are independent concerns: a caller embedding the auth provider in-process can use the provider file directly without the full beacon machinery.
 
-```mermaid
-graph TD
-	CLI[bin/ultravisor-auth-beacon.js<br/><small>CLI entry</small>]
-	BEACON[UltravisorAuthBeacon<br/><small>lifecycle</small>]
-	CAP[UltravisorAuthBeaconProvider<br/><small>Authentication capability</small>]
-	BC[ultravisor-beacon<br/>Beacon Client]
-	BASE[AuthProviderBase<br/><small>contract + defaults</small>]
-	MEM[MemoryAuthProvider]
-	EXT[ExternalDirectoryAuthProvider]
-	CUSTOM[Your AuthProvider]
-	UV[Ultravisor Server]
-
-	CLI -->|constructs| BEACON
-	BEACON -->|wraps as capability provider| CAP
-	BEACON -->|starts| BC
-	BC <-->|beacon WebSocket| UV
-	CAP -->|delegates AUTH_* to| BASE
-	BASE -.->|extended by| MEM
-	BASE -.->|extended by| EXT
-	BASE -.->|extended by| CUSTOM
-
-	style CAP fill:#e1f5fe
-	style BASE fill:#fff3e0
-	style CUSTOM fill:#c8e6c9
-```
+<!-- bespoke diagram: edit diagrams/components.mmd or .hints.json, then: npx pict-renderer-graph build modules/apps/ultravisor-auth-beacon/docs -->
+![Components](diagrams/components.svg)
 
 ## No HTTP Server of Its Own
 
@@ -65,27 +42,8 @@ Ultravisor's status surface reads `UserManagement` to decide whether to show in-
 
 ### Login
 
-```mermaid
-sequenceDiagram
-	participant UV as Ultravisor (mesh)
-	participant Cap as AuthBeaconProvider
-	participant P as AuthProvider
-	participant Audit as Audit hook + log
-
-	UV->>Cap: dispatch AUTH_Login { Username, Password, Method?, RequestingBeacon? }
-	Cap->>P: authenticate(Username, Password, Method)
-	alt credentials invalid
-		P-->>Cap: { Success: false, Reason }
-		Cap->>Audit: emit Login FAIL (scrubbed)
-		Cap-->>UV: Outputs { Success: false, Reason }
-	else credentials valid
-		P-->>Cap: { Success: true, UserContext }
-		Cap->>P: createSession(UserContext)
-		P-->>Cap: { SessionToken, ExpiresAt }
-		Cap->>Audit: emit Login OK (token scrubbed to last 8)
-		Cap-->>UV: Outputs { Success: true, UserContext, SessionToken, ExpiresAt }
-	end
-```
+<!-- bespoke diagram: edit diagrams/login.mmd or .hints.json, then: npx pict-renderer-graph build modules/apps/ultravisor-auth-beacon/docs -->
+![Login](diagrams/login.svg)
 
 `authenticate()` and `createSession()` are two separate provider calls: a provider can validate a credential without minting a session (and an authorization-only or token-introspection flow can skip the session step entirely).
 
